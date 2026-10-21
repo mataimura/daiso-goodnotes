@@ -1,4 +1,4 @@
-const CACHE='daiso-ink-offline-v01';
+const CACHE='daiso-ink-offline-v02';
 const FILES=['./','./index.html','./app.js','./pipeline.js','./goodnotes.js','./vendor/jszip.min.js',
   './manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',evt=>{

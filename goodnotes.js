@@ -120,37 +120,61 @@ function toDocument(strokeData,{widthPt=540,widthGain=.24,title='DAISO 手書き
   return {title,width:widthPt,height:strokeData.page.height*scale,strokes};
 }
 
-export async function exportGoodnotes(strokeData,thumbnailBlob,{widthPt=540,widthGain=.24,title='DAISO 手書きメモ'}={}){
+/**
+ * Encode multiple DAISO photos as pages of ONE editable Goodnotes notebook.
+ * Page order is input order. A single page follows exactly the same schema.
+ */
+export async function exportGoodnotesPages(strokePages, thumbnailBlob,
+    {widthPt=540,widthGain=.24,title='DAISO 手書きメモ'}={}){
   if(typeof JSZip==='undefined')throw new Error('ZIPライブラリが読み込まれていません');
-  const doc=toDocument(strokeData,{widthPt,widthGain,title});
-  const docId=uuid(),bgId=uuid(),templateId=uuid(),[pageId,noteId]=pairedUUIDs();
-  const background=makeBlankPDF(doc.width,doc.height);
+  if(!Array.isArray(strokePages)||strokePages.length===0)throw new Error('変換するページがありません');
+  const pages=strokePages.map((data,i)=>{
+    try{return toDocument(data,{widthPt,widthGain,title});}
+    catch(err){throw new Error(`${i+1}ページ目：${err.message}`);}
+  });
+  const docId=uuid();
   const files={
     'schema.pb':pb(1,SCHEMA),
     'document.info.pb':new Uint8Array(),
     'index.search.pb':new Uint8Array(),
-    [`attachments/${bgId}`]:background,
-    'index.attachments.pb':record(cat(pb(1,bgId),pb(2,`attachments/${bgId}`))),
-    'index.notes.pb':record(cat(pb(1,noteId),pb(2,`notes/${noteId}`))),
     'thumbnail.jpg':new Uint8Array(await thumbnailBlob.arrayBuffer())
   };
-  const meta=cat(pb(1,docId),pb(2,wrapped(doc.title)),pb(6,wrapped('P')),
+  const meta=cat(pb(1,docId),pb(2,wrapped(title)),pb(6,wrapped('P')),
     pb(9,'auto'),pb(11,uuid()),pb(13,1),pb(14,1),pb(20,SCHEMA));
   let events=record(cat(pb(1,docId),pb(30,meta)));
-  const attached=cat(pb(1,bgId),pb(2,bgId),pb(5,background.length),pb(6,docId),
-    pb(11,uuid()),pb(12,clock()),pb(14,1),pb(15,1),pb(16,SCHEMA));
-  const template=cat(pb(1,docId),pb(2,templateId),pb(4,bgId),pb(5,1),pb(6,1),
-    pb(8,cat(f32(1,doc.width),f32(2,doc.height))),pb(9,'DAISO digitized paper'),
-    pb(11,uuid()),pb(15,1),pb(16,1),pb(21,SCHEMA));
-  const pageEvent=cat(pb(1,docId),pb(2,pageId),pb(3,wrapped(templateId)),pb(4,wrapped('A000000')),
-    pb(11,uuid()),pb(13,1),pb(14,1),pb(15,SCHEMA));
-  for(const [id,tag,item] of [[bgId,6,attached],[templateId,2,template],[pageId,54,pageEvent]]){
-    events=cat(events,record(cat(pb(1,id),pb(tag,item))));
+  const notes=[];
+  const attachments=[];
+  for(let pageNumber=0;pageNumber<pages.length;pageNumber++){
+    const doc=pages[pageNumber];
+    const bgId=uuid(),templateId=uuid(),[pageId,noteId]=pairedUUIDs();
+    const background=makeBlankPDF(doc.width,doc.height);
+    files[`attachments/${bgId}`]=background;
+    attachments.push(record(cat(pb(1,bgId),pb(2,`attachments/${bgId}`))));
+    notes.push(record(cat(pb(1,noteId),pb(2,`notes/${noteId}`))));
+
+    const attached=cat(pb(1,bgId),pb(2,bgId),pb(5,background.length),pb(6,docId),
+      pb(11,uuid()),pb(12,clock()),pb(14,1),pb(15,1),pb(16,SCHEMA));
+    const template=cat(pb(1,docId),pb(2,templateId),pb(4,bgId),pb(5,1),pb(6,1),
+      pb(8,cat(f32(1,doc.width),f32(2,doc.height))),pb(9,'DAISO digitized paper'),
+      pb(11,uuid()),pb(15,1),pb(16,1),pb(21,SCHEMA));
+    const pageEvent=cat(pb(1,docId),pb(2,pageId),pb(3,wrapped(templateId)),
+      pb(4,wrapped(`A${String(pageNumber).padStart(6,'0')}`)),
+      pb(11,uuid()),pb(13,1),pb(14,1),pb(15,SCHEMA));
+    for(const [id,tag,item] of [[bgId,6,attached],[templateId,2,template],[pageId,54,pageEvent]]){
+      events=cat(events,record(cat(pb(1,id),pb(tag,item))));
+    }
+    files[`notes/${noteId}`]=cat(...doc.strokes.map((s,i)=>encodeStroke(s,uuid(),i+1)));
   }
+  files['index.notes.pb']=cat(...notes);
+  files['index.attachments.pb']=cat(...attachments);
   files['index.events.pb']=events;
-  files[`notes/${noteId}`]=cat(...doc.strokes.map((s,i)=>encodeStroke(s,uuid(),i+1)));
   const zip=new JSZip();
   for(const [name,bytes]of Object.entries(files))zip.file(name,bytes,{binary:true,createFolders:false});
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}});
-  return {blob,strokes:doc.strokes.length,title:doc.title};
+  return {blob,pages:pages.length,strokes:pages.reduce((n,p)=>n+p.strokes.length,0),title};
+}
+
+// Keep the original one-photo API working for previously saved integrations.
+export async function exportGoodnotes(strokeData,thumbnailBlob,options={}){
+  return exportGoodnotesPages([strokeData],thumbnailBlob,options);
 }

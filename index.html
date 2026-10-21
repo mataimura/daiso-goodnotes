@@ -35,6 +35,7 @@
     .file-btn{position:relative;overflow:hidden;width:100%;max-width:100%}
     .file-btn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
     .file-btn:focus-within{outline:3px solid #f2b956;outline-offset:2px}
+    .page-indicator{font-size:13px;font-weight:700;color:#185f59;margin:0 0 9px;overflow-wrap:anywhere}
     .filename{margin-top:10px;overflow-wrap:anywhere;font-size:13px;color:var(--muted)}
     .viewport{width:100%;border-radius:12px;overflow:hidden;background:#e1e6e4;border:1px solid var(--line);display:grid;place-items:center}
     canvas{display:block;max-width:100%;height:auto;max-height:57vh;object-fit:contain}
@@ -63,22 +64,31 @@
 <body>
   <header><div class="wrap">
     <h1>DAISO Ink <span style="font-weight:400;color:#a3d6cc">→</span> Goodnotes</h1>
-    <p class="lead">電子メモの写真を、編集できるデジタルインクに。</p>
+    <p class="lead">電子メモの写真をまとめて、編集できる複数ページのノートに。</p>
     <div class="pills"><span class="pill">無料</span><span class="pill">写真を送信しない</span><span class="pill">Safari対応を目指した試作版</span></div>
   </div></header>
   <main class="wrap">
     <section class="panel" id="input-panel">
       <div class="step">STEP 01</div><h2>電子メモを撮影・選択</h2>
-      <label class="btn file-btn">📷 写真を撮る・写真を選ぶ
-        <input id="photo-input" type="file" accept="image/*,.heic,.heif,.jpg,.jpeg,.png" aria-label="電子メモパッドの写真を選ぶ">
+      <label class="btn file-btn">📷 写真を複数枚選ぶ（1枚でもOK）
+        <input id="photo-input" type="file" accept="image/*,.heic,.heif,.jpg,.jpeg,.png" multiple aria-label="電子メモパッドの写真を複数選ぶ">
       </label>
-      <div class="filename" id="filename">DAISO 10.5インチの縦向き撮影写真に対応</div>
-      <p class="subnote">写真はiPhone内で処理。サーバーにはアップロードされません。</p>
+      <div class="filename" id="filename">DAISO 10.5インチの縦向き写真。最大20枚を1冊にまとめます。</div>
+      <p class="subnote">「写真ライブラリ」から複数枚をまとめて選べます。写真はiPhone内で処理され、サーバーにはアップロードされません。</p>
     </section>
     <section class="panel" id="crop-panel" hidden>
       <div class="step">STEP 02</div><h2>画面の四隅を確認</h2>
+      <div id="page-indicator" class="page-indicator"></div>
       <div class="viewport"><canvas id="photo-canvas" aria-label="写真と画面の輪郭"></canvas></div>
-      <p class="subnote">青緑の枠が液晶の内側に沿っていればOK。ずれている場合だけ「四隅を修正」を押す。</p>
+      <p class="subnote">青緑の枠が液晶の内側に沿っていればOK。ずれている場合だけ「四隅を修正」。矢印で写真を切り替え、順番も変更できます。</p>
+      <div class="row">
+        <button id="previous" class="btn secondary" type="button">◀ 前の写真</button>
+        <button id="next" class="btn secondary" type="button">次の写真 ▶</button>
+      </div>
+      <div class="row">
+        <button id="move-left" class="btn" type="button">↑ この写真を前のページへ</button>
+        <button id="move-right" class="btn" type="button">↓ この写真を次のページへ</button>
+      </div>
       <div class="row">
         <button id="auto-detect" class="btn secondary" type="button">◎ 自動検出し直す</button>
         <button id="edit-corners" class="btn" type="button">✎ 四隅を修正</button>
@@ -88,11 +98,16 @@
         <label for="sensitivity"><span>筆跡検出の感度</span><strong id="sensitivity-label">標準（9）</strong></label>
         <input id="sensitivity" type="range" min="5" max="17" step="1" value="9">
       </div>
-      <button id="convert" class="btn primary" style="width:100%" type="button">✧ デジタルインクに変換する</button>
+      <button id="convert" class="btn primary" style="width:100%" type="button">✧ まとめてGoodnotesに変換する</button>
     </section>
     <section class="panel" id="result-panel" hidden>
       <div class="step">STEP 03</div><h2>仕上がりとGoodnotes共有</h2>
+      <div id="result-page-indicator" class="page-indicator"></div>
       <div class="viewport"><canvas id="preview-canvas" aria-label="復元した筆跡のプレビュー"></canvas></div>
+      <div class="row">
+        <button id="preview-previous" class="btn" type="button">◀ 前のページ</button>
+        <button id="preview-next" class="btn" type="button">次のページ ▶</button>
+      </div>
       <div class="status" id="result-status" role="status"></div>
       <div class="row">
         <button id="share" class="btn primary" type="button">↗ Goodnotesへ共有</button>
@@ -102,7 +117,7 @@
       <p class="subnote">Goodnotes独自形式への非公式変換です。読み込み・投げ縄・消しゴムは端末で確認してください。元の写真は必ず保存してください。</p>
     </section>
   </main>
-  <footer>端末内処理 / バージョン 0.1（試作版）<br>DAISO 10.5インチ縦置き向け。画像は外部に送信しません。</footer>
+  <footer>端末内処理 / バージョン 0.2（複数ページ対応）<br>DAISO 10.5インチ縦置き向け。画像は外部に送信しません。</footer>
   <script src="vendor/jszip.min.js"></script>
   <script type="module" src="app.js"></script>
 </body></html>
